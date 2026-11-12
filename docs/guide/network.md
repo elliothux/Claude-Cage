@@ -30,6 +30,23 @@ VMess、VLESS 和 Trojan 的 WebSocket 节点可以导入旧字段 `ws-path`、`
 
 Hysteria2 节点可使用 `mport` 指定端口跳跃范围、`pinSHA256` 指定证书指纹，导入时会转换为核心支持的字段并保留功能。若节点使用不支持的协议、引用本机文件或网卡、管理字段重复、别名参数冲突或代理链不可用，会跳过该节点，并在来源下显示导入数量、跳过数量和原因。点击「查看原因」可展开具体节点；依赖失败节点的代理链也会跳过。若所有节点均被跳过，导入失败；更新影响当前出口或中转节点时保留原配置，请先应用其他节点再更新。其余节点还须整体通过核心配置校验，校验失败时原配置保持不变，可在设置的「日志与诊断」中导出诊断包查看校验记录。
 
+SSH 节点（`type: ssh`）可以把自己的 VPS 直接作为固定出口，服务器上只需开启 SSH，无需另外部署代理服务。可用 `password` 或 `private-key` 认证；`private-key` 须直接填写 PEM 私钥内容（含 `-----BEGIN ... PRIVATE KEY-----`），引用本机私钥文件路径的节点会被跳过，加密私钥可配合 `private-key-passphrase`。建议用 `host-key` 固定服务器公钥（`ssh-keyscan` 输出中的 `ssh-ed25519 AAAA...` 部分），未填写时核心不校验服务器身份。SSH 节点仅转发 TCP。示例：
+
+```yaml
+proxies:
+  - name: my-vps
+    type: ssh
+    server: 203.0.113.10
+    port: 22
+    username: root
+    private-key: |
+      -----BEGIN OPENSSH PRIVATE KEY-----
+      ...
+      -----END OPENSSH PRIVATE KEY-----
+    host-key:
+      - "ssh-ed25519 AAAA..."
+```
+
 同一个订阅地址可能按请求的客户端身份返回不同格式。Cage 下载时使用 Clash 客户端身份，服务商返回 YAML 时可以导入；若返回 Base64 或分享链接列表，仍需向服务商获取 Clash/Mihomo YAML。
 
 <figure class="guide-shot">

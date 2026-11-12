@@ -50,7 +50,7 @@ func parseNodes(data []byte, sourceID string) ([]Node, []NodeIssue, error) {
 		return nil, nil, errors.New("配置需要包含 1–3000 个 proxies 节点；仅含远程 provider 的配置请改为导入节点订阅链接")
 	}
 	types := map[string]bool{}
-	for _, k := range strings.Fields("http socks5 ss ssr vmess vless trojan hysteria hysteria2 tuic anytls mieru") {
+	for _, k := range strings.Fields("http socks5 ss ssr vmess vless trojan hysteria hysteria2 tuic anytls mieru ssh") {
 		types[k] = true
 	}
 	counts := map[string]int{}
@@ -91,7 +91,9 @@ func parseNodes(data []byte, sourceID string) ([]Node, []NodeIssue, error) {
 		default:
 			if err := normalizeWebSocket(p); err != nil {
 				issue.Reason = err.Error()
-			} else if unsafeOption(p) {
+			} else if typ == "ssh" && sshPrivateKeyPath(p) {
+				issue.Reason = "SSH 节点的 private-key 必须直接填写私钥内容，不能引用本机文件"
+			} else if unsafeOption(withoutSSHPrivateKey(p)) {
 				issue.Reason = "节点不能引用本机文件、网络接口或额外路由"
 			} else if typ == "hysteria2" {
 				if err := normalizeHysteria2(p); err != nil {
@@ -193,6 +195,34 @@ func normalizeImportKeys(p map[string]any, keys ...string) error {
 		}
 	}
 	return nil
+}
+
+// The core reads private-key as a file path unless the value contains
+// "PRIVATE KEY". Only inline key content keeps imports away from local files.
+func sshPrivateKeyPath(p map[string]any) bool {
+	if normalizeImportKeys(p, "private-key") != nil {
+		return true
+	}
+	raw, exists := p["private-key"]
+	if !exists {
+		return false
+	}
+	key, ok := raw.(string)
+	return !ok || !strings.Contains(key, "PRIVATE KEY")
+}
+
+// withoutSSHPrivateKey exempts only an SSH node's inline top-level key from the
+// file checks; nested options and every other protocol keep the full checks.
+func withoutSSHPrivateKey(p map[string]any) map[string]any {
+	if p["type"] != "ssh" {
+		return p
+	}
+	if _, exists := p["private-key"]; !exists {
+		return p
+	}
+	clone := maps.Clone(p)
+	delete(clone, "private-key")
+	return clone
 }
 
 func normalizeHysteria2(p map[string]any) error {
